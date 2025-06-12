@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { ethers } from 'ethers'
 import TPSChart from './components/TPSChart'
+import BarChart from './components/BarChart'
+import PieChart from './components/PieChart'
 import './App.css'
 
 interface Transaction {
@@ -110,6 +112,11 @@ function App() {
   const [showTransactionModal, setShowTransactionModal] = useState(false)
   const [latestTransaction, setLatestTransaction] = useState<Transaction | null>(null)
   
+  // Chart data states
+  const [transactionTypeData, setTransactionTypeData] = useState<any[]>([])
+  const [gasPriceData, setGasPriceData] = useState<any[]>([])
+  const [blockSizeData, setBlockSizeData] = useState<any[]>([])
+
   // Rate limiting refs
   const lastFetchTime = useRef<number>(0)
   const fetchInterval = useRef<NodeJS.Timeout | null>(null)
@@ -199,6 +206,11 @@ function App() {
               }
               
               setAllTransactions(allTxs)
+              
+              // Process chart data
+              setTransactionTypeData(processTransactionTypeData(allTxs))
+              setGasPriceData(processGasPriceData(allTxs))
+              setBlockSizeData(processBlockSizeData(blockHistory))
               
               // Update live transactions (keep last 5 for the live box)
               setLiveTransactions(prev => {
@@ -357,6 +369,75 @@ function App() {
     return parseFloat(ethers.formatEther(balance)).toFixed(4)
   }
 
+  // Chart data processing functions
+  const processTransactionTypeData = (transactions: Transaction[]) => {
+    const typeCounts = {
+      'High Value (>1 MON)': 0,
+      'Medium Value (0.1-1 MON)': 0,
+      'Low Value (<0.1 MON)': 0,
+      'Contract Creation': 0
+    }
+    
+    transactions.forEach(tx => {
+      const value = parseFloat(tx.value)
+      if (tx.to === 'Contract Creation') {
+        typeCounts['Contract Creation']++
+      } else if (value > 1) {
+        typeCounts['High Value (>1 MON)']++
+      } else if (value > 0.1) {
+        typeCounts['Medium Value (0.1-1 MON)']++
+      } else {
+        typeCounts['Low Value (<0.1 MON)']++
+      }
+    })
+    
+    return Object.entries(typeCounts).map(([label, value]) => ({
+      label,
+      value,
+      color: label.includes('High') ? '#ff6b6b' : 
+             label.includes('Medium') ? '#4ecdc4' : 
+             label.includes('Low') ? '#96ceb4' : '#feca57'
+    }))
+  }
+
+  const processGasPriceData = (transactions: Transaction[]) => {
+    const gasRanges = {
+      '0-10 Gwei': 0,
+      '10-50 Gwei': 0,
+      '50-100 Gwei': 0,
+      '100+ Gwei': 0
+    }
+    
+    transactions.forEach(tx => {
+      const gasPrice = parseFloat(tx.gasPrice)
+      if (gasPrice <= 10) {
+        gasRanges['0-10 Gwei']++
+      } else if (gasPrice <= 50) {
+        gasRanges['10-50 Gwei']++
+      } else if (gasPrice <= 100) {
+        gasRanges['50-100 Gwei']++
+      } else {
+        gasRanges['100+ Gwei']++
+      }
+    })
+    
+    return Object.entries(gasRanges).map(([label, value]) => ({
+      label,
+      value,
+      color: label.includes('0-10') ? '#4ecdc4' : 
+             label.includes('10-50') ? '#96ceb4' : 
+             label.includes('50-100') ? '#feca57' : '#ff6b6b'
+    }))
+  }
+
+  const processBlockSizeData = (blockHistory: Block[]) => {
+    return blockHistory.slice(0, 5).map((block, index) => ({
+      label: `Block #${block.number}`,
+      value: block.transactions,
+      color: `hsl(${200 + index * 30}, 70%, 60%)`
+    }))
+  }
+
   const handleRefresh = () => {
     setError(null)
     setIsLoading(true)
@@ -513,6 +594,35 @@ function App() {
               <TPSChart data={tpsData} />
             </div>
 
+            {/* Additional Charts */}
+            {allTransactions.length > 0 && (
+              <div className="charts-grid">
+                <div className="chart-section-compact">
+                  <PieChart 
+                    data={transactionTypeData}
+                    title="Transaction Types Distribution"
+                    size={180}
+                  />
+                </div>
+                
+                <div className="chart-section-compact">
+                  <PieChart 
+                    data={gasPriceData}
+                    title="Gas Price Distribution"
+                    size={180}
+                  />
+                </div>
+                
+                <div className="chart-section-compact">
+                  <BarChart 
+                    data={blockSizeData}
+                    title="Recent Block Transaction Counts"
+                    height={250}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Monanimal Nest (Block Details) */}
             {blockDetails && (
               <div className="block-details monanimal-nest">
@@ -531,7 +641,7 @@ function App() {
                   <p><strong>Gas Used:</strong> {parseInt(blockDetails.gasUsed).toLocaleString()}</p>
                   <p><strong>Gas Limit:</strong> {parseInt(blockDetails.gasLimit).toLocaleString()}</p>
                 </div>
-      </div>
+              </div>
             )}
 
             {/* All Transactions */}
@@ -558,7 +668,7 @@ function App() {
                       className="pagination-button"
                     >
                       Next →
-        </button>
+                    </button>
                   </div>
                 )}
                 
@@ -627,7 +737,7 @@ function App() {
           <p className="rate-limit-note">Updates every 20 seconds to respect RPC rate limits</p>
         </footer>
       </header>
-      </div>
+    </div>
   )
 }
 
