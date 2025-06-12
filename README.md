@@ -1,18 +1,21 @@
 # 🐒 Monad Testnet Visualizer 🚀
 
-A comprehensive real-time dashboard for monitoring Monad Testnet activity, built for the Monad Testnet Visualizer Contest.
+A comprehensive real-time dashboard for monitoring Monad Testnet activity and performance metrics.
 
 ## ✨ Features
 
 - **Real-time Block Monitoring**: Live updates of the latest block number every 10 seconds
 - **Network Statistics**: Current gas price, TPS, block time, and network performance metrics
 - **Interactive Search**: Search by block number, address, or transaction hash
-- **TPS Chart**: Real-time visualization of transactions per second over time
+- **Historical Trends**: Real-time visualization of TPS and Gas Price over time
+- **Live Benchmark Tests**: Simulated performance benchmarks including Token Bulk Dispatch, NFT Collection Deployment, and Advanced DeFi Operations.
+- **Transaction Export**: Export all fetched transactions to CSV format.
 - **Block Details**: Comprehensive information about the latest block including timestamp, transaction count, and gas usage
 - **Recent Transactions**: Live feed of recent transactions with detailed information
 - **Monad Lore Integration**: Fun "Monanimals" counter for bonus points
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
 - **Modern UI**: Beautiful gradient background with glassmorphism effects
+- **External Block Explorer Links**: Quick access to popular Monad block explorers for in-depth analysis.
 
 ## 🛠️ Technical Stack
 
@@ -59,11 +62,11 @@ monad-visualizer/
 │   ├── App.css              # Styling for the application
 │   ├── main.tsx             # Application entry point
 │   ├── components/
-│   │   └── TPSChart.tsx     # TPS visualization component
+│   │   └── LineChartComponent.tsx # Generic Line Chart for TPS and Gas Price
 │   └── assets/              # Static assets
 ├── public/                  # Public assets
 ├── package.json             # Project dependencies and scripts
-└── README.md               # Project documentation
+└── README.md                # Project documentation
 ```
 
 ## 📊 Features in Detail
@@ -108,19 +111,6 @@ The visualizer connects to Monad Testnet using the official RPC endpoint:
 - **Chain ID**: `10143`
 - **Currency**: MON
 
-## 🏆 Contest Submission
-
-This project is built for the **Monad Testnet Visualizer Contest** with the following features:
-
-✅ **Custom Frontend**: Built from scratch using React and TypeScript
-✅ **Real-time Data**: Live updates from Monad Testnet every 10 seconds
-✅ **Correct Information**: All data is fetched directly from the blockchain
-✅ **No Individual Farming**: Focuses on network-wide metrics
-✅ **Advanced Analytics**: TPS tracking, search functionality, and detailed statistics
-✅ **Bonus Points**: 
-- 🦧 **Silly/Left Curve**: "Monanimals Spotted" counter with random updates
-- 🐒 **Monad Lore**: Integration of "monanimals" concept throughout the interface
-
 ## ⚡ Performance Features
 
 - **10,000 TPS**: Monad's incredible transaction throughput
@@ -142,10 +132,6 @@ This project is built for the **Monad Testnet Visualizer Contest** with the foll
 - **Block**: `21207406`
 - **Address**: `0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6`
 - **Transaction**: `0x347f6c0c98a6cec9e27990968a2b5465d06de9fddebdf1cdb8fed7692e60d0ca`
-
-## 🤝 Contributing
-
-This is a contest submission for the Monad Testnet Visualizer Contest. Feel free to fork and enhance!
 
 ## 📄 License
 
