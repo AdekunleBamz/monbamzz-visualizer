@@ -319,14 +319,14 @@ function App() {
       } catch (err: any) {
         console.error("Error fetching data:", err)
         if (err.message.includes('rate limit') || err.message.includes('request limit')) {
-          setError('Rate limit reached. Please wait a moment and refresh.')
-          // Implement backoff: clear current interval and set a longer one
+          // Silently handle rate limit: clear current interval and set a longer one
+          console.warn('Rate limit reached. Automatically backing off.');
           if (fetchInterval.current) {
             clearInterval(fetchInterval.current)
           }
           fetchInterval.current = setInterval(fetchData, 60000) // Pause for 60 seconds
         } else {
-          setError(err.message)
+          setError(err.message) // Still show other errors
         }
       } finally {
         setIsLoading(false)
