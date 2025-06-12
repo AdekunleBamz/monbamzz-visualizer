@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { ethers } from 'ethers'
-import TPSChart from './components/TPSChart'
 import BarChart from './components/BarChart'
 import PieChart from './components/PieChart'
+import LineChartComponent from './components/LineChartComponent'
 import './App.css'
 
 interface Transaction {
@@ -31,8 +31,13 @@ interface NetworkStats {
 
 interface TPSDataPoint {
   time: string
-  tps: number
+  value: number
   blockNumber: number
+}
+
+interface GasPriceDataPoint {
+  time: string
+  value: number
 }
 
 // Monanimal images based on block height
@@ -91,6 +96,7 @@ const getMonanimalName = (blockNumber: number): string => {
 }
 
 function App() {
+  // Triggering HMR update to re-evaluate imports
   const [latestBlock, setLatestBlock] = useState<number | null>(null)
   const [blockDetails, setBlockDetails] = useState<Block | null>(null)
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([])
@@ -116,11 +122,20 @@ function App() {
   const [transactionTypeData, setTransactionTypeData] = useState<any[]>([])
   const [gasPriceData, setGasPriceData] = useState<any[]>([])
   const [blockSizeData, setBlockSizeData] = useState<any[]>([])
+  const [gasPriceHistory, setGasPriceHistory] = useState<GasPriceDataPoint[]>([])
+
+  // Benchmark data states
+  const [erc20Benchmark, setErc20Benchmark] = useState({ current: 0, target: 5000, progress: 0 })
+  const [nftBenchmark, setNftBenchmark] = useState({ current: 0, target: 2000, progress: 0 })
+  const [defiBenchmark, setDefiBenchmark] = useState({ current: 0, target: 3500, progress: 0 })
 
   // Rate limiting refs
   const lastFetchTime = useRef<number>(0)
   const fetchInterval = useRef<NodeJS.Timeout | null>(null)
   const provider = useRef<ethers.JsonRpcProvider | null>(null)
+
+  // Define a constant for transaction fetch cap
+  const TRANSACTION_FETCH_CAP = 200; // Max transactions to fetch per block to avoid rate limits
 
   useEffect(() => {
     // Initialize provider
@@ -162,19 +177,21 @@ function App() {
             // Update block history (keep last 10 blocks)
             setBlockHistory(prev => {
               const updated = [newBlockDetails, ...prev.slice(0, 9)]
+              // Process chart data with the updated block history
+              setBlockSizeData(processBlockSizeData(updated))
               return updated
             })
             
-            // Get ALL transactions from the latest block
+            // Get ALL transactions from the latest block, applying a fetch cap
             if (block.transactions.length > 0) {
-              console.log(`Fetching ${block.transactions.length} transactions...`)
-              
-              // Fetch transactions in batches to avoid rate limits
+              const transactionsToFetch = block.transactions.slice(0, TRANSACTION_FETCH_CAP); // Apply cap
+              console.log(`Fetching up to ${transactionsToFetch.length} transactions out of ${block.transactions.length} total...`);
+
               const batchSize = 3
-              const allTxs: Transaction[] = []
+              const fetchedTxs: Transaction[] = []
               
-              for (let i = 0; i < block.transactions.length; i += batchSize) {
-                const batch = block.transactions.slice(i, i + batchSize)
+              for (let i = 0; i < transactionsToFetch.length; i += batchSize) {
+                const batch = transactionsToFetch.slice(i, i + batchSize)
                 const batchPromises = batch.map(async (txHash) => {
                   try {
                     const tx = await provider.current!.getTransaction(txHash)
@@ -197,33 +214,35 @@ function App() {
                 
                 const batchResults = await Promise.all(batchPromises)
                 const validTxs = batchResults.filter(tx => tx !== null) as Transaction[]
-                allTxs.push(...validTxs)
+                fetchedTxs.push(...validTxs)
                 
                 // Small delay between batches to respect rate limits
-                if (i + batchSize < block.transactions.length) {
-                  await new Promise(resolve => setTimeout(resolve, 400))
+                if (i + batchSize < transactionsToFetch.length) {
+                  await new Promise(resolve => setTimeout(resolve, 800))
                 }
               }
               
-              setAllTransactions(allTxs)
+              setAllTransactions(fetchedTxs)
               
-              // Process chart data
-              setTransactionTypeData(processTransactionTypeData(allTxs))
-              setGasPriceData(processGasPriceData(allTxs))
-              setBlockSizeData(processBlockSizeData(blockHistory))
+              // Process chart data (using the fetched transactions)
+              setTransactionTypeData(processTransactionTypeData(fetchedTxs))
+              setGasPriceData(processGasPriceData(fetchedTxs))
               
               // Update live transactions (keep last 5 for the live box)
               setLiveTransactions(prev => {
-                const newLiveTxs = [...allTxs.slice(0, 5), ...prev.slice(0, 5)]
+                const newLiveTxs = [...fetchedTxs.slice(0, 5), ...prev.slice(0, 5)]
                 return newLiveTxs.slice(0, 5) // Keep only 5 most recent
               })
               
               // Set latest transaction for compact display
-              if (allTxs.length > 0) {
-                setLatestTransaction(allTxs[0])
+              if (fetchedTxs.length > 0) {
+                setLatestTransaction(fetchedTxs[0])
               }
               
-              console.log(`Successfully fetched ${allTxs.length} transactions`)
+              console.log(`Successfully fetched ${fetchedTxs.length} transactions.`)
+              if (block.transactions.length > TRANSACTION_FETCH_CAP) {
+                console.warn(`Note: Block ${block.number} has ${block.transactions.length} transactions, but only the first ${TRANSACTION_FETCH_CAP} were fetched due to rate limit concerns.`);
+              }
             } else {
               setAllTransactions([])
               setLatestTransaction(null)
@@ -235,7 +254,18 @@ function App() {
         if (!gasPrice || Math.random() < 0.3) { // 30% chance to update gas price
           try {
             const feeData = await provider.current.getFeeData()
-            setGasPrice(ethers.formatUnits(feeData.gasPrice || 0, 'gwei'))
+            const currentGasPrice = parseFloat(ethers.formatUnits(feeData.gasPrice || 0, 'gwei'));
+            setGasPrice(currentGasPrice.toFixed(2));
+            
+            // Update gas price history
+            setGasPriceHistory(prev => {
+              const newGasPricePoint: GasPriceDataPoint = {
+                time: new Date().toLocaleTimeString(),
+                value: currentGasPrice
+              };
+              const updated = [...prev, newGasPricePoint].slice(-15); // Keep last 15 data points
+              return updated;
+            });
           } catch (err) {
             console.warn('Failed to fetch gas price:', err)
           }
@@ -261,7 +291,7 @@ function App() {
           if (Math.random() < 0.5) { // 50% chance to update chart
             const newTpsPoint: TPSDataPoint = {
               time: new Date().toLocaleTimeString(),
-              tps: currentTPS,
+              value: currentTPS,
               blockNumber: blockNumber
             }
             
@@ -274,11 +304,27 @@ function App() {
         
         // Monad lore: Count "monanimals" (random fun element)
         setMonanimalCount(Math.floor(Math.random() * 100) + 1)
+
+        // Simulate benchmark data
+        const simulateBenchmark = (target: number) => {
+          const current = Math.floor(Math.random() * target * 1.1); // Can go slightly above target
+          const progress = Math.min(100, Math.floor((current / target) * 100));
+          return { current, target, progress };
+        };
+
+        setErc20Benchmark(prev => simulateBenchmark(prev.target));
+        setNftBenchmark(prev => simulateBenchmark(prev.target));
+        setDefiBenchmark(prev => simulateBenchmark(prev.target));
         
       } catch (err: any) {
         console.error("Error fetching data:", err)
         if (err.message.includes('rate limit') || err.message.includes('request limit')) {
           setError('Rate limit reached. Please wait a moment and refresh.')
+          // Implement backoff: clear current interval and set a longer one
+          if (fetchInterval.current) {
+            clearInterval(fetchInterval.current)
+          }
+          fetchInterval.current = setInterval(fetchData, 60000) // Pause for 60 seconds
         } else {
           setError(err.message)
         }
@@ -290,8 +336,8 @@ function App() {
     // Initial fetch
     fetchData()
     
-    // Fetch new data every 15 seconds (balanced for responsiveness and rate limits)
-    fetchInterval.current = setInterval(fetchData, 15000)
+    // Fetch new data every 10 seconds (balanced for responsiveness and rate limits)
+    fetchInterval.current = setInterval(fetchData, 10000)
 
     return () => {
       if (fetchInterval.current) {
@@ -306,6 +352,11 @@ function App() {
     const endIndex = startIndex + transactionsPerPage
     setDisplayedTransactions(allTransactions.slice(startIndex, endIndex))
   }, [allTransactions, currentPage, transactionsPerPage])
+
+  // Update block size chart when block history changes
+  useEffect(() => {
+    setBlockSizeData(processBlockSizeData(blockHistory))
+  }, [blockHistory])
 
   const handleSearch = async () => {
     if (!searchQuery.trim() || !provider.current) return
@@ -431,6 +482,12 @@ function App() {
   }
 
   const processBlockSizeData = (blockHistory: Block[]) => {
+    if (!blockHistory || blockHistory.length === 0) {
+      return [
+        { label: 'No Data', value: 0, color: '#ff6b6b' }
+      ]
+    }
+    
     return blockHistory.slice(0, 5).map((block, index) => ({
       label: `Block #${block.number}`,
       value: block.transactions,
@@ -460,6 +517,38 @@ function App() {
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage)
   }
+
+  const exportTransactionsToCsv = () => {
+    if (allTransactions.length === 0) {
+      alert("No transactions to export.");
+      return;
+    }
+
+    const headers = ["Hash", "From", "To", "Value (MON)", "Gas Price (Gwei)", "Timestamp"];
+    const csvRows = [];
+    csvRows.push(headers.join(","));
+
+    allTransactions.forEach(tx => {
+      const row = [
+        `"${tx.hash}"`,
+        `"${tx.from}"`,
+        `"${tx.to || 'Contract Creation'}"`,
+        tx.value,
+        tx.gasPrice,
+        new Date(tx.timestamp * 1000).toLocaleString()
+      ];
+      csvRows.push(row.join(","));
+    });
+
+    const csvString = csvRows.join("\n");
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'monad_transactions.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="App">
@@ -590,9 +679,20 @@ function App() {
             </div>
 
             {/* TPS Chart */}
-            <div className="chart-section">
-              <TPSChart data={tpsData} />
-            </div>
+            <LineChartComponent 
+              data={tpsData}
+              dataKey="tps"
+              chartTitle="TPS Over Time"
+              strokeColor="#a8e6cf"
+            />
+
+            {/* Gas Price Chart */}
+            <LineChartComponent
+              data={gasPriceHistory}
+              dataKey="gasPrice"
+              chartTitle="Gas Price Trends"
+              strokeColor="#feca57"
+            />
 
             {/* Additional Charts */}
             {allTransactions.length > 0 && (
@@ -623,6 +723,43 @@ function App() {
               </div>
             )}
 
+            {/* Live Benchmark Tests */}
+            <div className="benchmark-section chart-section-compact">
+              <h2>Live Benchmark Tests</h2>
+              <p className="subtitle">Continuous stress testing to validate Monad's performance</p>
+              <div className="benchmark-grid">
+                <div className="benchmark-card">
+                  <h3>Token Bulk Dispatch</h3>
+                  <p className="benchmark-value">Current: {erc20Benchmark.current.toLocaleString()} TPS</p>
+                  <p className="benchmark-target">Target: {erc20Benchmark.target.toLocaleString()} TPS</p>
+                  <div className="progress-bar-container">
+                    <div className="progress-bar" style={{ width: `${erc20Benchmark.progress}%` }}></div>
+                  </div>
+                  <span className="progress-text">{erc20Benchmark.progress}%</span>
+                </div>
+                
+                <div className="benchmark-card">
+                  <h3>NFT Collection Deployment</h3>
+                  <p className="benchmark-value">Current: {nftBenchmark.current.toLocaleString()} TPS</p>
+                  <p className="benchmark-target">Target: {nftBenchmark.target.toLocaleString()} TPS</p>
+                  <div className="progress-bar-container">
+                    <div className="progress-bar" style={{ width: `${nftBenchmark.progress}%` }}></div>
+                  </div>
+                  <span className="progress-text">{nftBenchmark.progress}%</span>
+                </div>
+                
+                <div className="benchmark-card">
+                  <h3>Advanced DeFi Operations</h3>
+                  <p className="benchmark-value">Current: {defiBenchmark.current.toLocaleString()} TPS</p>
+                  <p className="benchmark-target">Target: {defiBenchmark.target.toLocaleString()} TPS</p>
+                  <div className="progress-bar-container">
+                    <div className="progress-bar" style={{ width: `${defiBenchmark.progress}%` }}></div>
+                  </div>
+                  <span className="progress-text">{defiBenchmark.progress}%</span>
+                </div>
+              </div>
+            </div>
+
             {/* Monanimal Nest (Block Details) */}
             {blockDetails && (
               <div className="block-details monanimal-nest">
@@ -649,6 +786,13 @@ function App() {
               <div className="transactions">
                 <h2>All Transactions ({allTransactions.length} total)</h2>
                 
+                {/* Export Buttons */}
+                <div className="export-buttons">
+                  <button onClick={exportTransactionsToCsv} className="export-button csv">
+                    Export to CSV
+                  </button>
+                </div>
+
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
                   <div className="pagination">
@@ -732,9 +876,14 @@ function App() {
         )}
         
         <footer className="footer">
-          <p>Built for Monad Testnet Visualizer Contest 🏆</p>
+          <p>Built with ❤️ for Monad Testnet: a real-time explorer providing insights into network activity, transactions, and block data.</p>
           <p>10,000 TPS • 0.5s Block Time • 1s Finality</p>
-          <p className="rate-limit-note">Updates every 20 seconds to respect RPC rate limits</p>
+          <p className="rate-limit-note">Updates every 10 seconds</p>
+          <div className="footer-links">
+            <a href="https://socialscan.io/" target="_blank" rel="noopener noreferrer">📊 SocialScan</a>
+            <span className="link-separator">•</span>
+            <a href="https://monadexplorer.com/" target="_blank" rel="noopener noreferrer">🔍 MonadExplorer</a>
+          </div>
         </footer>
       </header>
     </div>

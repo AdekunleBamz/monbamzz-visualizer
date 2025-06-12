@@ -1,29 +1,31 @@
 import React from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
-interface TPSDataPoint {
-  time: string
-  tps: number
-  blockNumber: number
+interface ChartDataPoint {
+  time: string;
+  value: number; // Generic value for TPS, Gas Price, etc.
 }
 
-interface TPSChartProps {
-  data: TPSDataPoint[]
+interface LineChartProps {
+  data: ChartDataPoint[];
+  dataKey: string; // e.g., 'tps' or 'gasPrice'
+  chartTitle: string;
+  strokeColor: string;
 }
 
-const TPSChart: React.FC<TPSChartProps> = ({ data }) => {
+const LineChartComponent: React.FC<LineChartProps> = ({ data, dataKey, chartTitle, strokeColor }) => {
   if (data.length === 0) {
     return (
       <div className="chart-container">
-        <h3>TPS Over Time</h3>
+        <h3>{chartTitle}</h3>
         <p>Collecting data...</p>
       </div>
     )
   }
 
   return (
-    <div className="chart-container">
-      <h3>TPS Over Time</h3>
+    <div className="chart-section">
+      <h3>{chartTitle}</h3>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
@@ -44,14 +46,15 @@ const TPSChart: React.FC<TPSChartProps> = ({ data }) => {
               borderRadius: '8px',
               color: 'white'
             }}
+            formatter={(value: number) => [`${value.toFixed(2)} ${dataKey === 'tps' ? 'TPS' : 'Gwei'}`, chartTitle.includes('TPS') ? 'TPS' : 'Gas Price']}
           />
           <Line 
             type="monotone" 
-            dataKey="tps" 
-            stroke="#a8e6cf" 
+            dataKey="value" 
+            stroke={strokeColor} 
             strokeWidth={3}
-            dot={{ fill: '#a8e6cf', strokeWidth: 2, r: 4 }}
-            activeDot={{ r: 6, stroke: '#a8e6cf', strokeWidth: 2 }}
+            dot={{ fill: strokeColor, strokeWidth: 2, r: 4 }}
+            activeDot={{ r: 6, stroke: strokeColor, strokeWidth: 2 }}
           />
         </LineChart>
       </ResponsiveContainer>
@@ -59,4 +62,4 @@ const TPSChart: React.FC<TPSChartProps> = ({ data }) => {
   )
 }
 
-export default TPSChart 
+export default LineChartComponent 
