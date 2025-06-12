@@ -1,4 +1,4 @@
-# 🐒 Monad Testnet Visualizer 🚀
+# 🐒 MonBamzz Visualizer 🚀
 
 A comprehensive real-time dashboard for monitoring Monad Testnet activity and performance metrics.
 
@@ -37,7 +37,7 @@ A comprehensive real-time dashboard for monitoring Monad Testnet activity and pe
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/AdekunleBamz/monbamzz-visualizer.git
 cd monad-visualizer
 ```
 
