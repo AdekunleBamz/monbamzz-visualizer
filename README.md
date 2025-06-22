@@ -62,3 +62,7 @@ Build the production-ready code:
 npm run build
 ```
 This will create a `dist` folder with the optimized assets.
+
+## 📄 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
