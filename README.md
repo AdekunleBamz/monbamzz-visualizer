@@ -42,4 +42,23 @@ cd monad-visualizer
 ```
 
 2. Install dependencies:
-``
+```bash
+npm install
+```
+
+### Running the Development Server
+
+1. Start the development server:
+```bash
+npm run dev
+```
+
+2. Open your browser and navigate to `http://localhost:5173` (or the address shown in your terminal).
+
+## 🚢 Shipping to Production
+
+Build the production-ready code:
+```bash
+npm run build
+```
+This will create a `dist` folder with the optimized assets.
